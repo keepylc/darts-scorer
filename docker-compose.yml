@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  darts-scorer:
+    build: .
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      - PORT=${PORT:-3000}
+      - DATABASE_PATH=/app/data/darts.db
+    volumes:
+      - darts-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  darts-data:
