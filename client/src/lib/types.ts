@@ -10,6 +10,7 @@ export type GameState = {
   };
   players: {
     id: number;
+    gameId: number;
     name: string;
     orderIndex: number;
     score: number;
@@ -20,6 +21,12 @@ export type GameState = {
     averagePerTurn: number;
     suggestedFinish: FinishSuggestion | null;
   }[];
+  currentTurn: {
+    playerId: number;
+    turnNumber: number;
+    throws: { sector: number; multiplier: number; points: number; throwIndex: number }[];
+    runningScore: number;
+  } | null;
   recentHistory: {
     turnId: number;
     playerName: string;
@@ -28,7 +35,6 @@ export type GameState = {
     pointsScored: number;
     isBust: boolean;
     isWin: boolean;
-    dartsInTurn: number;
     throws: {
       sector: number;
       multiplier: number;

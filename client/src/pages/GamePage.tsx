@@ -33,6 +33,7 @@ export default function GamePage() {
   const [showWin, setShowWin] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const bustTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const confirmTurnRef = useRef<(throws?: DartThrow[]) => void>();
 
   // Detect win from server state
   useEffect(() => {
@@ -45,62 +46,6 @@ export default function GamePage() {
   // Get current player info
   const currentPlayer = gameState?.players.find((p) => p.isCurrentTurn);
   const scoreBefore = currentPlayer?.score ?? 0;
-
-  // Handle dart throw
-  const onThrow = useCallback(
-    (sector: number, multiplier: number) => {
-      if (!gameState || gameState.game.status === "finished") return;
-      if (currentThrows.length >= 3) return;
-      if (isSending) return;
-
-      const newThrows = [...currentThrows, { sector, multiplier }];
-
-      // Play sound
-      if (sector === 0 && multiplier === 0) {
-        // miss - no special sound
-      } else if (sector === 25) {
-        playSound("bull");
-      } else if (multiplier === 3) {
-        playSound("triple");
-      } else if (multiplier === 2) {
-        playSound("double");
-      } else {
-        playSound("hit");
-      }
-
-      // Check bust preview
-      const bust = isBustPreview(scoreBefore, newThrows);
-      const win = isWinPreview(scoreBefore, newThrows);
-
-      setCurrentThrows(newThrows);
-
-      // Auto-confirm on bust
-      if (bust) {
-        playSound("bust");
-        // Auto-submit after a brief delay
-        setTimeout(() => {
-          confirmTurn(newThrows);
-        }, 300);
-        return;
-      }
-
-      // Auto-confirm on win
-      if (win) {
-        setTimeout(() => {
-          confirmTurn(newThrows);
-        }, 300);
-        return;
-      }
-
-      // Auto-confirm on 3 throws
-      if (newThrows.length === 3) {
-        setTimeout(() => {
-          confirmTurn(newThrows);
-        }, 500);
-      }
-    },
-    [currentThrows, gameState, scoreBefore, isSending]
-  );
 
   // Confirm turn (send to server)
   const confirmTurn = useCallback(
@@ -141,6 +86,64 @@ export default function GamePage() {
       }
     },
     [currentPlayer, currentThrows, shareCode, invalidate, toast, isSending]
+  );
+
+  // I3 fix: keep ref always in sync so setTimeout closures use latest version
+  confirmTurnRef.current = confirmTurn;
+
+  // Handle dart throw
+  const onThrow = useCallback(
+    (sector: number, multiplier: number) => {
+      if (!gameState || gameState.game.status === "finished") return;
+      if (currentThrows.length >= 3) return;
+      if (isSending) return;
+
+      const newThrows = [...currentThrows, { sector, multiplier }];
+
+      // Play sound
+      if (sector === 0 && multiplier === 0) {
+        // miss - no special sound
+      } else if (sector === 25) {
+        playSound("bull");
+      } else if (multiplier === 3) {
+        playSound("triple");
+      } else if (multiplier === 2) {
+        playSound("double");
+      } else {
+        playSound("hit");
+      }
+
+      // Check bust preview
+      const bust = isBustPreview(scoreBefore, newThrows);
+      const win = isWinPreview(scoreBefore, newThrows);
+
+      setCurrentThrows(newThrows);
+
+      // Auto-confirm on bust
+      if (bust) {
+        playSound("bust");
+        setTimeout(() => {
+          confirmTurnRef.current?.(newThrows);
+        }, 300);
+        return;
+      }
+
+      // Auto-confirm on win
+      if (win) {
+        setTimeout(() => {
+          confirmTurnRef.current?.(newThrows);
+        }, 300);
+        return;
+      }
+
+      // Auto-confirm on 3 throws
+      if (newThrows.length === 3) {
+        setTimeout(() => {
+          confirmTurnRef.current?.(newThrows);
+        }, 500);
+      }
+    },
+    [currentThrows, gameState, scoreBefore, isSending]
   );
 
   // Undo last throw (UI only)

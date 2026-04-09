@@ -28,6 +28,50 @@ sqlite.pragma("journal_mode = WAL");
 
 export const db = drizzle(sqlite);
 
+// Auto-create tables on startup (C2 fix — fresh Docker containers have empty DB)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS games (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    share_code TEXT NOT NULL UNIQUE,
+    mode INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    winner_id INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER NOT NULL REFERENCES games(id),
+    name TEXT NOT NULL,
+    order_index INTEGER NOT NULL,
+    score INTEGER NOT NULL,
+    darts_thrown INTEGER NOT NULL DEFAULT 0,
+    total_points INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS turns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER NOT NULL REFERENCES games(id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    turn_number INTEGER NOT NULL,
+    score_before INTEGER NOT NULL,
+    score_after INTEGER NOT NULL,
+    points_scored INTEGER NOT NULL,
+    is_bust INTEGER NOT NULL DEFAULT 0,
+    is_win INTEGER NOT NULL DEFAULT 0,
+    darts_in_turn INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS throws (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    turn_id INTEGER NOT NULL REFERENCES turns(id),
+    throw_index INTEGER NOT NULL,
+    sector INTEGER NOT NULL,
+    multiplier INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+`);
+
 // ── Synchronous storage interface (C1 fix — no Promise/async) ────────
 
 export interface IStorage {
@@ -93,7 +137,8 @@ export class DatabaseStorage implements IStorage {
   // ── Submit turn ──────────────────────────────────────────────────
 
   submitTurn(shareCode: string, data: SubmitTurnRequest): GameState {
-    return db.transaction((tx) => {
+    // C1 fix: run mutation in transaction, build state after commit
+    const gameId = db.transaction((tx) => {
       const game = tx
         .select()
         .from(games)
@@ -124,7 +169,7 @@ export class DatabaseStorage implements IStorage {
         throw new ValidationError("Not this player's turn");
       }
 
-      // Compute throw points and check bust iteratively (C4 fix)
+      // Compute throw points and check bust iteratively
       const throwInputs = data.throws.map((t) => ({
         sector: t.sector,
         multiplier: t.multiplier,
@@ -132,7 +177,7 @@ export class DatabaseStorage implements IStorage {
 
       const result = isBustCheck(currentPlayer.score, throwInputs);
 
-      // Reject extra throws after bust (throws that came after bust point)
+      // Reject extra throws after bust
       if (result.validThrows.length < data.throws.length) {
         throw new ValidationError(
           "Extra throws after bust are not allowed",
@@ -203,20 +248,23 @@ export class DatabaseStorage implements IStorage {
           .run();
       }
 
-      // Return fresh state (use db, not tx, for buildGameState which uses db internally)
-      const updatedGame = tx
-        .select()
-        .from(games)
-        .where(eq(games.id, game.id))
-        .get()!;
-      return this.buildGameState(updatedGame);
+      return game.id;
     });
+
+    // Build state after transaction is committed — reads committed data
+    const updatedGame = db
+      .select()
+      .from(games)
+      .where(eq(games.id, gameId))
+      .get()!;
+    return this.buildGameState(updatedGame);
   }
 
   // ── Undo last turn ───────────────────────────────────────────────
 
   undoLastTurn(shareCode: string): GameState {
-    return db.transaction((tx) => {
+    // C1 fix: run mutation in transaction, build state after commit
+    const gameId = db.transaction((tx) => {
       const game = tx
         .select()
         .from(games)
@@ -272,14 +320,16 @@ export class DatabaseStorage implements IStorage {
       tx.delete(throws_).where(eq(throws_.turnId, lastTurn.id)).run();
       tx.delete(turns).where(eq(turns.id, lastTurn.id)).run();
 
-      // Return fresh state
-      const updatedGame = tx
-        .select()
-        .from(games)
-        .where(eq(games.id, game.id))
-        .get()!;
-      return this.buildGameState(updatedGame);
+      return game.id;
     });
+
+    // Build state after transaction is committed
+    const updatedGame = db
+      .select()
+      .from(games)
+      .where(eq(games.id, gameId))
+      .get()!;
+    return this.buildGameState(updatedGame);
   }
 
   // ── Polling helper ───────────────────────────────────────────────

@@ -63,18 +63,20 @@ function getRingColor(index: number): string {
   return index % 2 === 0 ? "#1db954" : "#e63946";
 }
 
-function getHighlightPath(sector: number, multiplier: number): { innerR: number; outerR: number } | null {
-  if (sector === 25 && multiplier === 2) return null; // circle
-  if (sector === 25 && multiplier === 1) return null; // circle
-  if (sector === 0) return null;
+function getHighlightPaths(sector: number, multiplier: number): { innerR: number; outerR: number }[] {
+  if (sector === 25) return []; // handled as circle
+  if (sector === 0) return [];
 
   if (multiplier === 1) {
-    // Could be inner or outer single — highlight both
-    return { innerR: R_BULL, outerR: R_INNER_SINGLE };
+    // I7 fix: highlight both inner single and outer single zones
+    return [
+      { innerR: R_BULL, outerR: R_INNER_SINGLE },
+      { innerR: R_TRIPLE_OUTER, outerR: R_OUTER_SINGLE },
+    ];
   }
-  if (multiplier === 3) return { innerR: R_INNER_SINGLE, outerR: R_TRIPLE_OUTER };
-  if (multiplier === 2) return { innerR: R_OUTER_SINGLE, outerR: R_DOUBLE_OUTER };
-  return null;
+  if (multiplier === 3) return [{ innerR: R_INNER_SINGLE, outerR: R_TRIPLE_OUTER }];
+  if (multiplier === 2) return [{ innerR: R_OUTER_SINGLE, outerR: R_DOUBLE_OUTER }];
+  return [];
 }
 
 export default function DartboardSVG({ onThrow, disabled, lastThrow }: DartboardProps) {
@@ -205,17 +207,21 @@ export default function DartboardSVG({ onThrow, disabled, lastThrow }: Dartboard
       if (sectorIndex >= 0) {
         const startAngle = OFFSET_DEG + sectorIndex * DEG_PER_SECTOR;
         const endAngle = startAngle + DEG_PER_SECTOR;
-        const hl = getHighlightPath(lastThrow.sector, lastThrow.multiplier);
-        if (hl) {
+        const hlPaths = getHighlightPaths(lastThrow.sector, lastThrow.multiplier);
+        if (hlPaths.length > 0) {
           highlightElement = (
-            <path
-              d={arcPath(CX, CY, hl.innerR, hl.outerR, startAngle, endAngle)}
-              fill="none"
-              stroke="#FFD700"
-              strokeWidth="2"
-              className="animate-dart-pulse"
-              style={{ pointerEvents: "none" }}
-            />
+            <g style={{ pointerEvents: "none" }}>
+              {hlPaths.map((hl, i) => (
+                <path
+                  key={i}
+                  d={arcPath(CX, CY, hl.innerR, hl.outerR, startAngle, endAngle)}
+                  fill="none"
+                  stroke="#FFD700"
+                  strokeWidth="2"
+                  className="animate-dart-pulse"
+                />
+              ))}
+            </g>
           );
         }
       }
