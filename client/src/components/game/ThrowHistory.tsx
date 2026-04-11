@@ -62,9 +62,10 @@ export default function ThrowHistory({ history }: ThrowHistoryProps) {
                     {entry.throws.map((t, i) => (
                       <span
                         key={i}
-                        className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono"
+                        className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1"
                       >
                         {formatThrow(t.sector, t.multiplier)}
+                        <span className="text-muted-foreground">·{t.points}</span>
                       </span>
                     ))}
                   </div>
