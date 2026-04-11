@@ -39,14 +39,22 @@ export default function GamePage() {
   const [showInvitePrompt, setShowInvitePrompt] = useState(!storedCode);
   const bustTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const confirmTurnRef = useRef<(throws?: DartThrow[]) => void>();
+  const prevStatusRef = useRef<string | null>(null);
 
   // Detect win from server state
   useEffect(() => {
-    if (gameState?.game.status === "finished") {
+    const prev = prevStatusRef.current;
+    const current = gameState?.game.status ?? null;
+    prevStatusRef.current = current;
+
+    // Only show overlay when:
+    // 1. Status JUST transitioned active → finished (not loaded already-finished)
+    // 2. This user is a participant (has the invite code)
+    if (prev === "active" && current === "finished" && isParticipant) {
       setShowWin(true);
       playSound("win");
     }
-  }, [gameState?.game.status]);
+  }, [gameState?.game.status, isParticipant]);
 
   // Get current player info
   const currentPlayer = gameState?.players.find((p) => p.isCurrentTurn);
@@ -320,6 +328,7 @@ export default function GamePage() {
         show={showWin && isFinished}
         winnerName={winnerPlayer?.name || ""}
         shareCode={shareCode}
+        onClose={() => setShowWin(false)}
       />
     </motion.div>
   );

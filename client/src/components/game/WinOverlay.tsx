@@ -7,6 +7,7 @@ interface WinOverlayProps {
   show: boolean;
   winnerName: string;
   shareCode: string;
+  onClose: () => void;
 }
 
 // Simple confetti particle system
@@ -87,7 +88,7 @@ function useConfetti(active: boolean) {
   return canvasRef;
 }
 
-export default function WinOverlay({ show, winnerName, shareCode }: WinOverlayProps) {
+export default function WinOverlay({ show, winnerName, shareCode, onClose }: WinOverlayProps) {
   const [, navigate] = useLocation();
   const canvasRef = useConfetti(show);
 
@@ -116,6 +117,18 @@ export default function WinOverlay({ show, winnerName, shareCode }: WinOverlayPr
             transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.2 }}
             className="relative z-10 text-center space-y-6 px-6"
           >
+            {/* Close button (top-right) */}
+            <button
+              onClick={onClose}
+              aria-label="Закрыть"
+              className="absolute -top-10 right-0 text-white/60 hover:text-white transition-colors p-2"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M15 5L5 15M5 5l10 10"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+
             <h2 className="text-5xl font-bold text-yellow-400 drop-shadow-lg">
               ПОБЕДА!
             </h2>
@@ -123,7 +136,7 @@ export default function WinOverlay({ show, winnerName, shareCode }: WinOverlayPr
               {winnerName}
             </p>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               <Button
                 onClick={() => navigate("/")}
                 size="lg"
@@ -138,6 +151,14 @@ export default function WinOverlay({ show, winnerName, shareCode }: WinOverlayPr
                 className="min-h-[44px] bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
                 Поделиться
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                size="lg"
+                className="min-h-[44px] text-white/70 hover:text-white hover:bg-white/10"
+              >
+                Смотреть историю
               </Button>
             </div>
           </motion.div>
