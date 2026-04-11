@@ -104,6 +104,23 @@ export async function registerRoutes(
     res.json(state);
   });
 
+  // ── POST /api/games/:shareCode/verify-invite — validate PIN ───
+
+  app.post("/api/games/:shareCode/verify-invite", (req, res) => {
+    if (!isValidShareCode(req.params.shareCode)) {
+      return res.status(404).json({ message: "Game not found" });
+    }
+    const inviteCode = req.headers["x-invite-code"] as string | undefined;
+    if (!inviteCode) {
+      return res.status(400).json({ message: "Missing invite code" });
+    }
+    const valid = storage.verifyInviteCode(req.params.shareCode, inviteCode);
+    if (!valid) {
+      return res.status(403).json({ message: "Неверный код приглашения" });
+    }
+    res.json({ ok: true });
+  });
+
   // ── POST /api/games/:shareCode/turns — submit turn ─────────────
 
   app.post("/api/games/:shareCode/turns", (req, res) => {

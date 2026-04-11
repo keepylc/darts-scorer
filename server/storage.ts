@@ -89,6 +89,7 @@ export interface IStorage {
   submitTurn(shareCode: string, data: SubmitTurnRequest, inviteCode?: string): GameState;
   undoLastTurn(shareCode: string, inviteCode?: string): GameState;
   getGameUpdatedAt(shareCode: string): number | undefined;
+  verifyInviteCode(shareCode: string, inviteCode: string): boolean;
 }
 
 // ── DatabaseStorage implementation ───────────────────────────────────
@@ -347,6 +348,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(games.id, gameId))
       .get()!;
     return this.buildGameState(updatedGame);
+  }
+
+  // ── Verify invite code ───────────────────────────────────────────
+
+  verifyInviteCode(shareCode: string, inviteCode: string): boolean {
+    const row = db
+      .select({ inviteCode: games.inviteCode })
+      .from(games)
+      .where(eq(games.shareCode, shareCode))
+      .get();
+    return row !== undefined && row.inviteCode === inviteCode;
   }
 
   // ── Polling helper ───────────────────────────────────────────────

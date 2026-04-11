@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { storeInviteCode } from "@/lib/inviteCode";
+import { apiRequest } from "@/lib/queryClient";
 
 interface InviteCodePromptProps {
   shareCode: string;
@@ -16,8 +17,9 @@ export default function InviteCodePrompt({
 }: InviteCodePromptProps) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     const trimmed = code.trim();
     if (trimmed.length === 0) {
       setError("Введите код приглашения");
@@ -27,8 +29,26 @@ export default function InviteCodePrompt({
       setError("Введите 4-значный код");
       return;
     }
-    storeInviteCode(shareCode, trimmed);
-    onJoined();
+
+    setIsVerifying(true);
+    try {
+      await apiRequest(
+        "POST",
+        `/api/games/${shareCode}/verify-invite`,
+        undefined,
+        { "X-Invite-Code": trimmed },
+      );
+      storeInviteCode(shareCode, trimmed);
+      onJoined();
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("403:")) {
+        setError("Неверный код приглашения");
+      } else {
+        setError("Ошибка проверки кода");
+      }
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -49,10 +69,10 @@ export default function InviteCodePrompt({
           maxLength={4}
           inputMode="numeric"
           className="w-24 text-center text-lg font-mono min-h-[44px]"
-          onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+          onKeyDown={(e) => { if (e.key === "Enter") handleJoin(); }}
         />
-        <Button onClick={handleJoin} className="min-h-[44px]">
-          Войти
+        <Button onClick={handleJoin} disabled={isVerifying} className="min-h-[44px]">
+          {isVerifying ? "..." : "Войти"}
         </Button>
         <Button
           variant="ghost"

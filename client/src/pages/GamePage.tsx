@@ -22,7 +22,7 @@ import BustOverlay from "@/components/game/BustOverlay";
 import WinOverlay from "@/components/game/WinOverlay";
 import InviteCodePrompt from "@/components/game/InviteCodePrompt";
 import { Button } from "@/components/ui/button";
-import { Share2, Loader2 } from "lucide-react";
+import { Share2, Loader2, Copy } from "lucide-react";
 
 export default function GamePage() {
   const params = useParams<{ code: string }>();
@@ -267,6 +267,20 @@ export default function GamePage() {
         <div>
           <h1 className="text-lg font-bold">{gameState.game.mode} — Игра</h1>
           <p className="text-xs text-muted-foreground">Код: {shareCode}</p>
+          {isParticipant && storedCode && (
+            <button
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+              onClick={() =>
+                navigator.clipboard.writeText(storedCode).then(
+                  () => toast({ title: "Код скопирован" }),
+                  () => {}
+                )
+              }
+            >
+              <span className="font-mono tracking-widest">{storedCode}</span>
+              <Copy className="h-3 w-3" />
+            </button>
+          )}
         </div>
         <Button
           variant="outline"
