@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { storage, NotFoundError, ValidationError, ForbiddenError } from "./storage";
 import {
   createGameSchema,
@@ -7,6 +8,37 @@ import {
   type GameState,
 } from "@shared/schema";
 import { ZodError } from "zod";
+
+// ── Rate limiters ────────────────────────────────────────────────────
+
+/** Strict limiter for game creation — prevent spam */
+const createGameLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Too many games created, please try again later" },
+});
+
+/** General API limiter */
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later" },
+});
+
+// ── Share-code format guard ──────────────────────────────────────────
+
+/** shareCode must be exactly 8 lowercase hex chars (matches crypto.randomBytes(4).toString("hex")) */
+const SHARE_CODE_RE = /^[0-9a-f]{8}$/;
+function isValidShareCode(code: string): boolean {
+  return SHARE_CODE_RE.test(code);
+}
+
+/** Max concurrent long-poll waiters per game (prevents memory exhaustion) */
+const MAX_WAITERS_PER_GAME = 30;
 
 // ── Express augmentation for visitorId ───────────────────────────────
 
@@ -36,15 +68,15 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
-  // Middleware: extract X-Visitor-Id header
-  app.use("/api", (req, _res, next) => {
+  // Middleware: extract X-Visitor-Id header + general rate limit
+  app.use("/api", apiLimiter, (req, _res, next) => {
     req.visitorId = req.headers["x-visitor-id"] as string | undefined;
     next();
   });
 
   // ── POST /api/games — create game ──────────────────────────────
 
-  app.post("/api/games", (req, res) => {
+  app.post("/api/games", createGameLimiter, (req, res) => {
     try {
       const data = createGameSchema.parse(req.body);
       const result = storage.createGame(data);
@@ -62,6 +94,9 @@ export async function registerRoutes(
   // ── GET /api/games/:shareCode — full game state ────────────────
 
   app.get("/api/games/:shareCode", (req, res) => {
+    if (!isValidShareCode(req.params.shareCode)) {
+      return res.status(404).json({ message: "Game not found" });
+    }
     const state = storage.getGameState(req.params.shareCode);
     if (!state) {
       return res.status(404).json({ message: "Game not found" });
@@ -72,6 +107,9 @@ export async function registerRoutes(
   // ── POST /api/games/:shareCode/turns — submit turn ─────────────
 
   app.post("/api/games/:shareCode/turns", (req, res) => {
+    if (!isValidShareCode(req.params.shareCode)) {
+      return res.status(404).json({ message: "Game not found" });
+    }
     try {
       const inviteCode = req.headers["x-invite-code"] as string | undefined;
       const data = submitTurnSchema.parse(req.body);
@@ -94,6 +132,9 @@ export async function registerRoutes(
   // ── POST /api/games/:shareCode/undo — undo last turn ───────────
 
   app.post("/api/games/:shareCode/undo", (req, res) => {
+    if (!isValidShareCode(req.params.shareCode)) {
+      return res.status(404).json({ message: "Game not found" });
+    }
     try {
       const inviteCode = req.headers["x-invite-code"] as string | undefined;
       const state = storage.undoLastTurn(req.params.shareCode, inviteCode);
@@ -114,6 +155,11 @@ export async function registerRoutes(
 
   app.get("/api/games/:shareCode/poll", (req, res) => {
     const { shareCode } = req.params;
+
+    if (!isValidShareCode(shareCode)) {
+      return res.status(404).json({ message: "Game not found" });
+    }
+
     const since = parseInt(req.query.since as string) || 0;
 
     const currentUpdatedAt = storage.getGameUpdatedAt(shareCode);
@@ -125,6 +171,11 @@ export async function registerRoutes(
     if (currentUpdatedAt > since) {
       const state = storage.getGameState(shareCode);
       return res.json(state);
+    }
+
+    // Reject if too many concurrent waiters (memory-exhaustion guard)
+    if ((waiters.get(shareCode)?.length ?? 0) >= MAX_WAITERS_PER_GAME) {
+      return res.status(429).json({ message: "Too many concurrent connections" });
     }
 
     // Long poll: wait up to 25 seconds for an update
