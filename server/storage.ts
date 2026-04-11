@@ -36,6 +36,7 @@ sqlite.exec(`
     mode INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
     winner_id INTEGER,
+    invite_code TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -72,13 +73,21 @@ sqlite.exec(`
   );
 `);
 
+// Migration: add invite_code if database pre-dates this column
+{
+  const cols = sqlite.pragma("table_info(games)") as { name: string }[];
+  if (!cols.some((c) => c.name === "invite_code")) {
+    sqlite.prepare("ALTER TABLE games ADD COLUMN invite_code TEXT NOT NULL DEFAULT ''").run();
+  }
+}
+
 // ── Synchronous storage interface (C1 fix — no Promise/async) ────────
 
 export interface IStorage {
-  createGame(data: CreateGameRequest): { shareCode: string };
+  createGame(data: CreateGameRequest): { shareCode: string; inviteCode: string };
   getGameState(shareCode: string): GameState | undefined;
-  submitTurn(shareCode: string, data: SubmitTurnRequest): GameState;
-  undoLastTurn(shareCode: string): GameState;
+  submitTurn(shareCode: string, data: SubmitTurnRequest, inviteCode?: string): GameState;
+  undoLastTurn(shareCode: string, inviteCode?: string): GameState;
   getGameUpdatedAt(shareCode: string): number | undefined;
 }
 
@@ -87,8 +96,9 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // ── Create game ──────────────────────────────────────────────────
 
-  createGame(data: CreateGameRequest): { shareCode: string } {
+  createGame(data: CreateGameRequest): { shareCode: string; inviteCode: string } {
     const shareCode = crypto.randomBytes(4).toString("hex"); // 8 hex chars
+    const inviteCode = Math.floor(1000 + Math.random() * 9000).toString();
     const now = Date.now();
 
     // Run inside a transaction for atomicity
@@ -99,6 +109,7 @@ export class DatabaseStorage implements IStorage {
           shareCode,
           mode: data.mode,
           status: "active",
+          inviteCode,
           createdAt: now,
           updatedAt: now,
         })
@@ -119,7 +130,7 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    return { shareCode };
+    return { shareCode, inviteCode };
   }
 
   // ── Get game state ───────────────────────────────────────────────
@@ -136,7 +147,7 @@ export class DatabaseStorage implements IStorage {
 
   // ── Submit turn ──────────────────────────────────────────────────
 
-  submitTurn(shareCode: string, data: SubmitTurnRequest): GameState {
+  submitTurn(shareCode: string, data: SubmitTurnRequest, inviteCode?: string): GameState {
     // C1 fix: run mutation in transaction, build state after commit
     const gameId = db.transaction((tx) => {
       const game = tx
@@ -147,6 +158,9 @@ export class DatabaseStorage implements IStorage {
       if (!game) throw new NotFoundError("Game not found");
       if (game.status === "finished")
         throw new ValidationError("Game is finished");
+      if (!inviteCode || inviteCode !== game.inviteCode) {
+        throw new ForbiddenError("Неверный код приглашения");
+      }
 
       // Determine current player
       const gamePlayers = tx
@@ -262,7 +276,7 @@ export class DatabaseStorage implements IStorage {
 
   // ── Undo last turn ───────────────────────────────────────────────
 
-  undoLastTurn(shareCode: string): GameState {
+  undoLastTurn(shareCode: string, inviteCode?: string): GameState {
     // C1 fix: run mutation in transaction, build state after commit
     const gameId = db.transaction((tx) => {
       const game = tx
@@ -271,6 +285,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(games.shareCode, shareCode))
         .get();
       if (!game) throw new NotFoundError("Game not found");
+      if (!inviteCode || inviteCode !== game.inviteCode) {
+        throw new ForbiddenError("Неверный код приглашения");
+      }
 
       // Find last turn
       const lastTurn = tx
@@ -460,6 +477,13 @@ export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ValidationError";
+  }
+}
+
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
   }
 }
 

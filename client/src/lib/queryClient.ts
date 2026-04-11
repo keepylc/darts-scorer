@@ -22,10 +22,12 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<Response> {
   const headers: Record<string, string> = {
     "X-Visitor-Id": getVisitorId(),
+    ...extraHeaders,
   };
   if (data) {
     headers["Content-Type"] = "application/json";

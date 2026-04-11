@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
+import { storeInviteCode } from "@/lib/inviteCode";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Play, BookOpen } from "lucide-react";
 import { Link } from "wouter";
@@ -68,7 +69,12 @@ export default function HomePage() {
           playerNames: names,
         });
         const data = await res.json();
-        toast({ title: "Игра создана!" });
+        storeInviteCode(data.shareCode, data.inviteCode);
+        toast({
+          title: "Игра создана!",
+          description: `Код для участников: ${data.inviteCode}`,
+          duration: 10000,
+        });
         navigate(`/game/${data.shareCode}`);
       } catch (err) {
         toast({

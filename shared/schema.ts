@@ -12,6 +12,7 @@ export const games = sqliteTable("games", {
   winnerId: integer("winner_id"), // FK → players.id, NULL while game is active
   createdAt: integer("created_at").notNull(), // Unix timestamp (ms)
   updatedAt: integer("updated_at").notNull(), // updated on every turn
+  inviteCode: text("invite_code").notNull().default(""),
 });
 
 export const players = sqliteTable("players", {

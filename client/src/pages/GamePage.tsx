@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { motion } from "framer-motion";
 import { useGamePolling } from "@/hooks/useGamePolling";
 import { apiRequest } from "@/lib/queryClient";
+import { getInviteCode, clearInviteCode } from "@/lib/inviteCode";
 import { useToast } from "@/hooks/use-toast";
 import { playSound } from "@/lib/sounds";
 import {
@@ -19,6 +20,7 @@ import CurrentTurnPanel from "@/components/game/CurrentTurnPanel";
 import ThrowHistory from "@/components/game/ThrowHistory";
 import BustOverlay from "@/components/game/BustOverlay";
 import WinOverlay from "@/components/game/WinOverlay";
+import InviteCodePrompt from "@/components/game/InviteCodePrompt";
 import { Button } from "@/components/ui/button";
 import { Share2, Loader2 } from "lucide-react";
 
@@ -32,6 +34,9 @@ export default function GamePage() {
   const [showBust, setShowBust] = useState(false);
   const [showWin, setShowWin] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const storedCode = getInviteCode(shareCode);
+  const [isParticipant, setIsParticipant] = useState(!!storedCode);
+  const [showInvitePrompt, setShowInvitePrompt] = useState(!storedCode);
   const bustTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const confirmTurnRef = useRef<(throws?: DartThrow[]) => void>();
 
@@ -47,6 +52,11 @@ export default function GamePage() {
   const currentPlayer = gameState?.players.find((p) => p.isCurrentTurn);
   const scoreBefore = currentPlayer?.score ?? 0;
 
+  const inviteHeaders = useCallback((): Record<string, string> => {
+    const code = getInviteCode(shareCode);
+    return code ? { "X-Invite-Code": code } : {};
+  }, [shareCode]);
+
   // Confirm turn (send to server)
   const confirmTurn = useCallback(
     async (throws?: DartThrow[]) => {
@@ -55,13 +65,18 @@ export default function GamePage() {
 
       setIsSending(true);
       try {
-        const res = await apiRequest("POST", `/api/games/${shareCode}/turns`, {
-          playerId: currentPlayer.id,
-          throws: throwsToSend.map((t) => ({
-            sector: t.sector,
-            multiplier: t.multiplier,
-          })),
-        });
+        const res = await apiRequest(
+          "POST",
+          `/api/games/${shareCode}/turns`,
+          {
+            playerId: currentPlayer.id,
+            throws: throwsToSend.map((t) => ({
+              sector: t.sector,
+              multiplier: t.multiplier,
+            })),
+          },
+          inviteHeaders(),
+        );
         const data = await res.json();
 
         // Check if the turn was a bust
@@ -75,6 +90,13 @@ export default function GamePage() {
         setCurrentThrows([]);
         invalidate();
       } catch (err) {
+        if (err instanceof Error && err.message.startsWith("403:")) {
+          clearInviteCode(shareCode);
+          setIsParticipant(false);
+          setShowInvitePrompt(true);
+          toast({ title: "Неверный код приглашения", variant: "destructive" });
+          return;
+        }
         toast({
           title: "Ошибка",
           description:
@@ -85,7 +107,7 @@ export default function GamePage() {
         setIsSending(false);
       }
     },
-    [currentPlayer, currentThrows, shareCode, invalidate, toast, isSending]
+    [currentPlayer, currentThrows, shareCode, invalidate, toast, isSending, inviteHeaders]
   );
 
   // I3 fix: keep ref always in sync so setTimeout closures use latest version
@@ -156,7 +178,7 @@ export default function GamePage() {
     if (isSending) return;
     setIsSending(true);
     try {
-      await apiRequest("POST", `/api/games/${shareCode}/undo`);
+      await apiRequest("POST", `/api/games/${shareCode}/undo`, undefined, inviteHeaders());
       setCurrentThrows([]);
       setShowWin(false);
       invalidate();
@@ -171,7 +193,7 @@ export default function GamePage() {
     } finally {
       setIsSending(false);
     }
-  }, [shareCode, invalidate, toast, isSending]);
+  }, [shareCode, invalidate, toast, isSending, inviteHeaders]);
 
   // Share button
   const handleShare = useCallback(() => {
@@ -246,9 +268,16 @@ export default function GamePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Mobile: dartboard first */}
         <div className="lg:order-2">
+          {showInvitePrompt && !isFinished && (
+            <InviteCodePrompt
+              shareCode={shareCode}
+              onJoined={() => { setIsParticipant(true); setShowInvitePrompt(false); }}
+              onSkip={() => setShowInvitePrompt(false)}
+            />
+          )}
           <DartboardSVG
             onThrow={onThrow}
-            disabled={isFinished || isSending}
+            disabled={isFinished || isSending || !isParticipant}
             lastThrow={lastThrow}
           />
         </div>
@@ -257,7 +286,7 @@ export default function GamePage() {
         <div className="lg:order-1 space-y-3">
           <PlayerScoreboard players={gameState.players} />
 
-          {!isFinished && (
+          {!isFinished && isParticipant && (
             <CurrentTurnPanel
               throws={currentThrows}
               scoreBefore={scoreBefore}

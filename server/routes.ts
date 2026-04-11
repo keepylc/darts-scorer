@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { type Server } from "http";
-import { storage, NotFoundError, ValidationError } from "./storage";
+import { storage, NotFoundError, ValidationError, ForbiddenError } from "./storage";
 import {
   createGameSchema,
   submitTurnSchema,
@@ -73,22 +73,20 @@ export async function registerRoutes(
 
   app.post("/api/games/:shareCode/turns", (req, res) => {
     try {
+      const inviteCode = req.headers["x-invite-code"] as string | undefined;
       const data = submitTurnSchema.parse(req.body);
-      const state = storage.submitTurn(req.params.shareCode, data);
+      const state = storage.submitTurn(req.params.shareCode, data, inviteCode);
       notifyGameUpdated(req.params.shareCode, state);
       res.json(state);
     } catch (err) {
-      if (err instanceof ZodError) {
-        return res
-          .status(400)
-          .json({ message: err.errors.map((e) => e.message).join("; ") });
-      }
-      if (err instanceof NotFoundError) {
+      if (err instanceof ZodError)
+        return res.status(400).json({ message: err.errors.map((e) => e.message).join("; ") });
+      if (err instanceof NotFoundError)
         return res.status(404).json({ message: err.message });
-      }
-      if (err instanceof ValidationError) {
+      if (err instanceof ValidationError)
         return res.status(400).json({ message: err.message });
-      }
+      if (err instanceof ForbiddenError)
+        return res.status(403).json({ message: err.message });
       throw err;
     }
   });
@@ -97,16 +95,17 @@ export async function registerRoutes(
 
   app.post("/api/games/:shareCode/undo", (req, res) => {
     try {
-      const state = storage.undoLastTurn(req.params.shareCode);
+      const inviteCode = req.headers["x-invite-code"] as string | undefined;
+      const state = storage.undoLastTurn(req.params.shareCode, inviteCode);
       notifyGameUpdated(req.params.shareCode, state);
       res.json(state);
     } catch (err) {
-      if (err instanceof NotFoundError) {
+      if (err instanceof NotFoundError)
         return res.status(404).json({ message: err.message });
-      }
-      if (err instanceof ValidationError) {
+      if (err instanceof ValidationError)
         return res.status(400).json({ message: err.message });
-      }
+      if (err instanceof ForbiddenError)
+        return res.status(403).json({ message: err.message });
       throw err;
     }
   });
