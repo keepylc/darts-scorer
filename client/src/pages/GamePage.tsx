@@ -184,6 +184,13 @@ export default function GamePage() {
       invalidate();
       toast({ title: "Ход отменён" });
     } catch (err) {
+      if (err instanceof Error && err.message.startsWith("403:")) {
+        clearInviteCode(shareCode);
+        setIsParticipant(false);
+        setShowInvitePrompt(true);
+        toast({ title: "Неверный код приглашения", variant: "destructive" });
+        return;
+      }
       toast({
         title: "Ошибка",
         description:

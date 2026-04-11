@@ -98,7 +98,7 @@ export class DatabaseStorage implements IStorage {
 
   createGame(data: CreateGameRequest): { shareCode: string; inviteCode: string } {
     const shareCode = crypto.randomBytes(4).toString("hex"); // 8 hex chars
-    const inviteCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const inviteCode = crypto.randomInt(1000, 10000).toString();
     const now = Date.now();
 
     // Run inside a transaction for atomicity
@@ -454,8 +454,10 @@ export class DatabaseStorage implements IStorage {
       };
     });
 
+    const { inviteCode: _inviteCode, ...safeGame } = game;
+
     return {
-      game,
+      game: safeGame,
       players: enrichedPlayers,
       currentTurn,
       recentHistory,

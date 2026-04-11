@@ -125,7 +125,7 @@ export type FinishSuggestion = {
 };
 
 export type GameState = {
-  game: Game;
+  game: Omit<Game, "inviteCode">;
   players: (Player & {
     isCurrentTurn: boolean;
     averagePerDart: number;

@@ -23,6 +23,10 @@ export default function InviteCodePrompt({
       setError("Введите код приглашения");
       return;
     }
+    if (trimmed.length !== 4) {
+      setError("Введите 4-значный код");
+      return;
+    }
     storeInviteCode(shareCode, trimmed);
     onJoined();
   };
