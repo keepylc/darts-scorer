@@ -6,50 +6,62 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 function SimpleBoardDiagram() {
+  const cx = 132, cy = 150;
+
+  const legend = [
+    { color: "#e63946", label: "Double (×2)",      sub: "внешнее узкое кольцо" },
+    { color: "#888888", label: "Single (×1)",       sub: "основная зона сектора" },
+    { color: "#1db954", label: "Triple (×3)",       sub: "внутреннее узкое кольцо" },
+    { color: "#1db954", label: "Bull — 25 очков",   sub: "зелёный центр" },
+    { color: "#e63946", label: "D-Bull — 50 очков", sub: "красная точка (Double Out)" },
+  ];
+
   return (
-    <svg viewBox="0 0 300 300" className="w-full max-w-[240px] mx-auto my-4">
-      {/* Background */}
-      <circle cx="150" cy="150" r="145" fill="#1a1a1a" />
+    <svg
+      viewBox="0 0 370 305"
+      className="w-full max-w-[340px] mx-auto my-4"
+      aria-label="Схема мишени дартс"
+    >
+      {/* Board: layers from outside-in, each circle masks the previous */}
+      <circle cx={cx} cy={cy} r={130} fill="#e63946" />
+      <circle cx={cx} cy={cy} r={104} fill="#2a2a2a" />
+      <circle cx={cx} cy={cy} r={78}  fill="#1db954" />
+      <circle cx={cx} cy={cy} r={52}  fill="#2a2a2a" />
+      <circle cx={cx} cy={cy} r={24}  fill="#1db954" />
+      <circle cx={cx} cy={cy} r={10}  fill="#e63946" />
+      <circle cx={cx} cy={cy} r={130} fill="none"
+              stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
 
-      {/* Double ring */}
-      <circle cx="150" cy="150" r="130" fill="none" stroke="#e63946" strokeWidth="6" />
+      {/* "20" label at top of board */}
+      <text x={cx} y={cy - 112} fill="white" fontSize="14" fontWeight="bold"
+            textAnchor="middle" dominantBaseline="central"
+            style={{ pointerEvents: "none" }}>
+        20
+      </text>
 
-      {/* Triple ring */}
-      <circle cx="150" cy="150" r="78" fill="none" stroke="#1db954" strokeWidth="6" />
+      {/* Right-side legend panel */}
+      <rect x="275" y="28" width="88" height="250" rx="8"
+            fill="rgba(255,255,255,0.04)"
+            stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+      <text x="283" y="48" fill="rgba(255,255,255,0.6)"
+            fontSize="11" fontWeight="600">
+        Зоны
+      </text>
 
-      {/* Outer single zone label */}
-      <circle cx="150" cy="150" r="104" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" strokeDasharray="4 4" />
-
-      {/* Inner single zone label */}
-      <circle cx="150" cy="150" r="52" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" strokeDasharray="4 4" />
-
-      {/* Bull */}
-      <circle cx="150" cy="150" r="24" fill="#1db954" opacity="0.7" />
-
-      {/* Double Bull */}
-      <circle cx="150" cy="150" r="10" fill="#e63946" opacity="0.8" />
-
-      {/* Labels */}
-      <text x="150" y="12" fill="white" fontSize="11" textAnchor="middle" fontWeight="bold">20</text>
-
-      {/* Zone labels */}
-      <text x="230" y="80" fill="rgba(255,255,255,0.5)" fontSize="8" textAnchor="middle">Double (x2)</text>
-      <text x="230" y="108" fill="rgba(255,255,255,0.5)" fontSize="8" textAnchor="middle">Single</text>
-      <text x="220" y="130" fill="rgba(255,255,255,0.5)" fontSize="8" textAnchor="middle">Triple (x3)</text>
-      <text x="210" y="152" fill="rgba(255,255,255,0.5)" fontSize="8" textAnchor="middle">Single</text>
-      <text x="150" y="147" fill="white" fontSize="7" textAnchor="middle">Bull 25</text>
-      <text x="150" y="155" fill="white" fontSize="6" textAnchor="middle">D-Bull 50</text>
-
-      {/* Arrows */}
-      <line x1="220" y1="82" x2="200" y2="95" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" markerEnd="url(#arrowhead)" />
-      <line x1="218" y1="110" x2="195" y2="115" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-      <line x1="210" y1="132" x2="192" y2="132" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-
-      <defs>
-        <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-          <polygon points="0 0, 6 2, 0 4" fill="rgba(255,255,255,0.3)" />
-        </marker>
-      </defs>
+      {legend.map(({ color, label, sub }, i) => {
+        const y = 70 + i * 44;
+        return (
+          <g key={label}>
+            <rect x="283" y={y - 7} width="11" height="11" rx="2" fill={color} />
+            <text x="300" y={y} fill="white" fontSize="11" dominantBaseline="central">
+              {label}
+            </text>
+            <text x="300" y={y + 14} fill="rgba(255,255,255,0.45)" fontSize="9">
+              {sub}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
