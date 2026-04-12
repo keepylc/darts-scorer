@@ -6,62 +6,26 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 function SimpleBoardDiagram() {
-  const cx = 132, cy = 150;
-
-  const legend = [
-    { color: "#e63946", label: "Double (×2)",      sub: "внешнее узкое кольцо" },
-    { color: "#888888", label: "Single (×1)",       sub: "основная зона сектора" },
-    { color: "#1db954", label: "Triple (×3)",       sub: "внутреннее узкое кольцо" },
-    { color: "#1db954", label: "Bull — 25 очков",   sub: "зелёный центр" },
-    { color: "#e63946", label: "D-Bull — 50 очков", sub: "красная точка (Double Out)" },
-  ];
+  const cx = 130, cy = 130;
 
   return (
     <svg
-      viewBox="0 0 370 305"
-      className="w-full max-w-[340px] mx-auto my-4"
+      viewBox="0 0 260 260"
+      className="w-full max-w-[180px] mx-auto my-2"
       aria-label="Схема мишени дартс"
     >
-      {/* Board: layers from outside-in, each circle masks the previous */}
-      <circle cx={cx} cy={cy} r={130} fill="#e63946" />
-      <circle cx={cx} cy={cy} r={104} fill="#2a2a2a" />
-      <circle cx={cx} cy={cy} r={78}  fill="#1db954" />
-      <circle cx={cx} cy={cy} r={52}  fill="#2a2a2a" />
-      <circle cx={cx} cy={cy} r={24}  fill="#1db954" />
+      <circle cx={cx} cy={cy} r={126} fill="#e63946" />
+      <circle cx={cx} cy={cy} r={101} fill="#2a2a2a" />
+      <circle cx={cx} cy={cy} r={76}  fill="#1db954" />
+      <circle cx={cx} cy={cy} r={51}  fill="#2a2a2a" />
+      <circle cx={cx} cy={cy} r={23}  fill="#1db954" />
       <circle cx={cx} cy={cy} r={10}  fill="#e63946" />
-      <circle cx={cx} cy={cy} r={130} fill="none"
-              stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-
-      {/* "20" label at top of board */}
-      <text x={cx} y={cy - 112} fill="white" fontSize="14" fontWeight="bold"
-            textAnchor="middle" dominantBaseline="central"
-            style={{ pointerEvents: "none" }}>
+      <circle cx={cx} cy={cy} r={126} fill="none"
+              stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+      <text x={cx} y={cy - 108} fill="white" fontSize="13" fontWeight="bold"
+            textAnchor="middle" dominantBaseline="central">
         20
       </text>
-
-      {/* Right-side legend panel */}
-      <rect x="275" y="28" width="88" height="250" rx="8"
-            fill="rgba(255,255,255,0.04)"
-            stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-      <text x="283" y="48" fill="rgba(255,255,255,0.6)"
-            fontSize="11" fontWeight="600">
-        Зоны
-      </text>
-
-      {legend.map(({ color, label, sub }, i) => {
-        const y = 70 + i * 44;
-        return (
-          <g key={label}>
-            <rect x="283" y={y - 7} width="11" height="11" rx="2" fill={color} />
-            <text x="300" y={y} fill="white" fontSize="11" dominantBaseline="central">
-              {label}
-            </text>
-            <text x="300" y={y + 14} fill="rgba(255,255,255,0.45)" fontSize="9">
-              {sub}
-            </text>
-          </g>
-        );
-      })}
     </svg>
   );
 }
@@ -115,33 +79,27 @@ export default function RulesPage() {
 
             <SimpleBoardDiagram />
 
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-muted/50 p-2 rounded">
-                  <span className="font-medium text-foreground">Single (x1)</span>
-                  <br />
-                  <span>Основная зона сектора</span>
-                </div>
-                <div className="bg-muted/50 p-2 rounded">
-                  <span className="font-medium text-foreground">Double (x2)</span>
-                  <br />
-                  <span>Узкое внешнее кольцо</span>
-                </div>
-                <div className="bg-muted/50 p-2 rounded">
-                  <span className="font-medium text-foreground">Triple (x3)</span>
-                  <br />
-                  <span>Узкое внутреннее кольцо</span>
-                </div>
-                <div className="bg-muted/50 p-2 rounded">
-                  <span className="font-medium text-foreground">Bull / D-Bull</span>
-                  <br />
-                  <span>25 / 50 очков (центр)</span>
-                </div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">Зоны мишени</h3>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { color: "bg-[#2a2a2a] border border-border", dot: "", label: "Single (×1)", sub: "Основная зона сектора — очки равны номеру" },
+                  { color: "", dot: "bg-[#e63946]", label: "Double (×2)", sub: "Внешнее узкое кольцо — очки удваиваются" },
+                  { color: "", dot: "bg-[#1db954]", label: "Triple (×3)", sub: "Внутреннее узкое кольцо — очки утраиваются" },
+                  { color: "", dot: "bg-[#1db954]", label: "Bull — 25 очков", sub: "Зелёный центр мишени" },
+                  { color: "", dot: "bg-[#e63946]", label: "Double Bull — 50 очков", sub: "Красная точка в центре, засчитывается как Double" },
+                ].map(({ dot, label, sub }) => (
+                  <div key={label} className="flex items-start gap-3 bg-muted/50 px-3 py-2.5 rounded">
+                    <span className={`mt-1 shrink-0 w-3 h-3 rounded-sm ${dot || "bg-muted-foreground/30 border border-border"}`} />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{label}</p>
+                      <p className="text-sm text-muted-foreground">{sub}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="leading-relaxed">
-                Каждый сектор пронумерован от 1 до 20. Очки = номер сектора × множитель.
-                Максимум за один дротик — T20 (тройной сектор 20) = 60 очков.
-                Double Bull (центр мишени) = 50 очков.
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Максимум за один дротик — T20 = 60 очков. Максимальный финиш за 3 дротика — 170 (T20 T20 D-Bull).
               </p>
             </div>
           </CardContent>
